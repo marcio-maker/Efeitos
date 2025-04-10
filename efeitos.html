@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Efeito de Linhas Interativas com Three.js</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #0f0f1a;
+            cursor: none;
+        }
+        canvas {
+            display: block;
+        }
+        .sensitivity-controls {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            color: white;
+            font-family: Arial, sans-serif;
+            background: rgba(0,0,0,0.7);
+            padding: 10px;
+            border-radius: 5px;
+            z-index: 100;
+        }
+        label {
+            display: block;
+            margin: 5px 0;
+        }
+    </style>
+</head>
+<body>
+    <!-- Controles de sensibilidade (opcional) -->
+    <div class="sensitivity-controls">
+        <h3>Controles de Sensibilidade</h3>
+        <label>
+            Rotação X: <input type="range" id="rotX" min="0" max="0.005" step="0.0001" value="0.0008">
+            <span id="rotXValue">0.0008</span>
+        </label>
+        <label>
+            Rotação Y: <input type="range" id="rotY" min="0" max="0.005" step="0.0001" value="0.0008">
+            <span id="rotYValue">0.0008</span>
+        </label>
+        <label>
+            Suavização: <input type="range" id="smooth" min="0" max="0.2" step="0.01" value="0.05">
+            <span id="smoothValue">0.05</span>
+        </label>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        // Configurações iniciais
+        const settings = {
+            lineCount: 15,           // Número de linhas
+            segments: 8,            // Segmentos por linha
+            lineWidth: 0.5,         // Largura da linha
+            color: 0x4a8fe7,       // Cor base
+            hoverColor: 0xff6b6b,  // Cor quando perto do mouse
+            sensitivity: {
+                rotX: 0.0008,      // Sensibilidade rotação X
+                rotY: 0.0008,      // Sensibilidade rotação Y
+                smooth: 0.05        // Fator de suavização
+            },
+            mouseRadius: 0.3        // Raio de influência do mouse
+        };
+
+        // Inicialização da cena Three.js
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        document.body.appendChild(renderer.domElement);
+
+        // Posição do mouse
+        const mouse = new THREE.Vector2();
+        const mouseTarget = new THREE.Vector2();
+
+        // Array para armazenar as linhas
+        const lines = [];
+
+        // Criar material da linha
+        const lineMaterial = new THREE.LineBasicMaterial({ 
+            color: settings.color,
+            linewidth: settings.lineWidth
+        });
+
+        // Criar múltiplas linhas
+        for (let i = 0; i < settings.lineCount; i++) {
+            const points = [];
+            
+            // Criar pontos aleatórios para a linha
+            for (let j = 0; j < settings.segments; j++) {
+                points.push(new THREE.Vector3(
+                    (Math.random() - 0.5) * 20,
+                    (Math.random() - 0.5) * 20,
+                    (Math.random() - 0.5) * 20
+                ));
+            }
+            
+            // Criar geometria e linha
+            const geometry = new THREE.BufferGeometry().setFromPoints(points);
+            const line = new THREE.Line(geometry, lineMaterial.clone());
+            
+            // Posição e rotação inicial aleatória
+            line.position.set(
+                (Math.random() - 0.5) * 10,
+                (Math.random() - 0.5) * 10,
+                (Math.random() - 0.5) * 10
+            );
+            
+            line.rotation.set(
+                Math.random() * Math.PI,
+                Math.random() * Math.PI,
+                Math.random() * Math.PI
+            );
+            
+            // Adicionar à cena e ao array
+            scene.add(line);
+            lines.push({
+                object: line,
+                originalColor: settings.color,
+                speed: Math.random() * 0.002 + 0.001
+            });
+        }
+
+        // Posicionar a câmera
+        camera.position.z = 30;
+
+        // Variáveis para suavização
+        let currentRotationX = 0;
+        let currentRotationY = 0;
+
+        // Evento de movimento do mouse
+        window.addEventListener('mousemove', (event) => {
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+            
+            mouseTarget.x = mouse.x * 5;
+            mouseTarget.y = mouse.y * 5;
+        });
+
+        // Atualizar controles de sensibilidade
+        document.getElementById('rotX').addEventListener('input', (e) => {
+            settings.sensitivity.rotX = parseFloat(e.target.value);
+            document.getElementById('rotXValue').textContent = e.target.value;
+        });
+        
+        document.getElementById('rotY').addEventListener('input', (e) => {
+            settings.sensitivity.rotY = parseFloat(e.target.value);
+            document.getElementById('rotYValue').textContent = e.target.value;
+        });
+        
+        document.getElementById('smooth').addEventListener('input', (e) => {
+            settings.sensitivity.smooth = parseFloat(e.target.value);
+            document.getElementById('smoothValue').textContent = e.target.value;
+        });
+
+        // Redimensionamento da janela
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // Função de animação
+        const animate = () => {
+            requestAnimationFrame(animate);
+            
+            // Suavizar o movimento do mouse
+            currentRotationX += (mouse.y * settings.sensitivity.rotX - currentRotationX) * settings.sensitivity.smooth;
+            currentRotationY += (mouse.x * settings.sensitivity.rotY - currentRotationY) * settings.sensitivity.smooth;
+            
+            // Atualizar cada linha
+            lines.forEach((lineObj) => {
+                const line = lineObj.object;
+                
+                // Rotação baseada no mouse
+                line.rotation.x += currentRotationX;
+                line.rotation.y += currentRotationY;
+                
+                // Rotação automática adicional
+                line.rotation.z += lineObj.speed * 0.5;
+                
+                // Efeito de proximidade com o mouse (muda a cor)
+                const distanceToMouse = Math.sqrt(
+                    Math.pow(line.position.x - mouseTarget.x, 2) + 
+                    Math.pow(line.position.y - mouseTarget.y, 2)
+                );
+                
+                if (distanceToMouse < settings.mouseRadius * 10) {
+                    line.material.color.setHex(settings.hoverColor);
+                } else {
+                    line.material.color.setHex(lineObj.originalColor);
+                }
+            });
+            
+            renderer.render(scene, camera);
+        };
+
+        animate();
+    </script>
+</body>
+</html>
